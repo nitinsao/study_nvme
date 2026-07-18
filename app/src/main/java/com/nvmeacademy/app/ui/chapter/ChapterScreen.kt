@@ -1,6 +1,7 @@
 package com.nvmeacademy.app.ui.chapter
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,7 +49,7 @@ import com.nvmeacademy.app.data.LocalContentRepository
 import com.nvmeacademy.app.data.db.entities.ChapterEntity
 import com.nvmeacademy.app.data.db.entities.SlideEntity
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ChapterScreen(chapterId: Int, onBack: () -> Unit) {
     val repository = LocalContentRepository.current
@@ -141,6 +142,7 @@ private fun SlidePage(slide: SlideEntity) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun PagerDots(pagerState: PagerState, count: Int) {
     Row(
