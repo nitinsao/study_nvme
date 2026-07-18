@@ -84,4 +84,21 @@ class ContentIntegrityTest {
         assertTrue("Expected at least 30 chapters, found $chapterCount", chapterCount >= 30)
         assertTrue("Expected at least 90 commands, found ${AllCommands.commands.size}", AllCommands.commands.size >= 90)
     }
+
+    @Test
+    fun `data structure ids are unique and every structure has fields`() {
+        val ids = AllDataStructures.structures.map { it.id }
+        assertEquals("Duplicate data structure id found", ids.size, ids.toSet().size)
+        for (structure in AllDataStructures.structures) {
+            assertFalse("Structure ${structure.id} has blank name", structure.name.isBlank())
+            assertFalse("Structure ${structure.id} (${structure.name}) has blank summary", structure.summary.isBlank())
+            assertFalse("Structure ${structure.id} (${structure.name}) has blank source citation", structure.source.isBlank())
+            assertTrue("Structure ${structure.id} (${structure.name}) has no fields", structure.fields.isNotEmpty())
+            for (field in structure.fields) {
+                assertFalse("A field in structure ${structure.id} (${structure.name}) has a blank range", field.range.isBlank())
+                assertFalse("A field in structure ${structure.id} (${structure.name}) has a blank field name", field.fieldName.isBlank())
+                assertFalse("A field in structure ${structure.id} (${structure.name}) has a blank description", field.fieldDescription.isBlank())
+            }
+        }
+    }
 }

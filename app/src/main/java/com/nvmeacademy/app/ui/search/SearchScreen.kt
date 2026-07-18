@@ -34,15 +34,17 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nvmeacademy.app.data.LocalContentRepository
 import com.nvmeacademy.app.data.db.entities.CommandEntity
+import com.nvmeacademy.app.data.db.entities.DataStructureEntity
 import com.nvmeacademy.app.data.db.entities.GlossaryEntity
 
 @Composable
-fun SearchScreen(onCommandClick: (Int) -> Unit) {
+fun SearchScreen(onCommandClick: (Int) -> Unit, onStructureClick: (Int) -> Unit) {
     val repository = LocalContentRepository.current
     var query by remember { mutableStateOf("") }
     var selectedTab by remember { mutableIntStateOf(0) }
 
     val commands by repository.searchCommands(query).collectAsStateWithLifecycle(initialValue = emptyList())
+    val structures by repository.searchDataStructures(query).collectAsStateWithLifecycle(initialValue = emptyList())
     val glossaryTerms by repository.searchGlossary(query).collectAsStateWithLifecycle(initialValue = emptyList())
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -60,13 +62,14 @@ fun SearchScreen(onCommandClick: (Int) -> Unit) {
 
         TabRow(selectedTabIndex = selectedTab) {
             Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Commands") })
-            Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Glossary") })
+            Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Structures") })
+            Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("Glossary") })
         }
 
-        if (selectedTab == 0) {
-            CommandResultsList(commands = commands, onCommandClick = onCommandClick)
-        } else {
-            GlossaryResultsList(terms = glossaryTerms)
+        when (selectedTab) {
+            0 -> CommandResultsList(commands = commands, onCommandClick = onCommandClick)
+            1 -> StructureResultsList(structures = structures, onStructureClick = onStructureClick)
+            else -> GlossaryResultsList(terms = glossaryTerms)
         }
     }
 }
@@ -128,6 +131,45 @@ private fun OpcodeBadge(opcode: String) {
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
         )
+    }
+}
+
+@Composable
+private fun StructureResultsList(structures: List<DataStructureEntity>, onStructureClick: (Int) -> Unit) {
+    if (structures.isEmpty()) {
+        EmptyState(text = "No matching data structures.")
+        return
+    }
+    LazyColumn(
+        contentPadding = PaddingValues(vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(structures, key = { it.id }) { structure ->
+            StructureRow(structure = structure, onClick = { onStructureClick(structure.id) })
+        }
+    }
+}
+
+@Composable
+private fun StructureRow(structure: DataStructureEntity, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            OpcodeBadge(opcode = structure.category)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(structure.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(structure.summary, style = MaterialTheme.typography.bodyMedium, maxLines = 2)
+            }
+        }
     }
 }
 

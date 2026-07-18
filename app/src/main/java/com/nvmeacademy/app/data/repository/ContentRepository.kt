@@ -1,12 +1,15 @@
 package com.nvmeacademy.app.data.repository
 
 import com.nvmeacademy.app.data.content.AllCommands
+import com.nvmeacademy.app.data.content.AllDataStructures
 import com.nvmeacademy.app.data.content.AllGlossary
 import com.nvmeacademy.app.data.content.AllParts
 import com.nvmeacademy.app.data.db.AppDatabase
 import com.nvmeacademy.app.data.db.entities.ChapterEntity
 import com.nvmeacademy.app.data.db.entities.CommandEntity
 import com.nvmeacademy.app.data.db.entities.CommandFieldEntity
+import com.nvmeacademy.app.data.db.entities.DataStructureEntity
+import com.nvmeacademy.app.data.db.entities.DataStructureFieldEntity
 import com.nvmeacademy.app.data.db.entities.GlossaryEntity
 import com.nvmeacademy.app.data.db.entities.PartEntity
 import com.nvmeacademy.app.data.db.entities.SlideEntity
@@ -65,11 +68,29 @@ class ContentRepository(private val db: AppDatabase) {
 
         val glossary = AllGlossary.terms.map { GlossaryEntity(term = it.term, definition = it.definition) }
 
+        val structures = AllDataStructures.structures.map { s ->
+            DataStructureEntity(
+                id = s.id,
+                order = s.order,
+                category = s.category,
+                name = s.name,
+                summary = s.summary,
+                sourceCitation = s.source
+            )
+        }
+        val structureFields = AllDataStructures.structures.flatMap { s ->
+            s.fields.mapIndexed { index, f ->
+                DataStructureFieldEntity(structureId = s.id, order = index, range = f.range, fieldName = f.fieldName, fieldDescription = f.fieldDescription)
+            }
+        }
+
         db.partDao().insertAll(parts)
         db.chapterDao().insertAll(chapters)
         db.slideDao().insertAll(slides)
         db.commandDao().insertAll(commands)
         db.commandFieldDao().insertAll(fields)
+        db.dataStructureDao().insertAll(structures)
+        db.dataStructureFieldDao().insertAll(structureFields)
         db.glossaryDao().insertAll(glossary)
     }
 
@@ -85,4 +106,9 @@ class ContentRepository(private val db: AppDatabase) {
 
     fun searchGlossary(query: String): Flow<List<GlossaryEntity>> = db.glossaryDao().search(query)
     fun observeGlossary(): Flow<List<GlossaryEntity>> = db.glossaryDao().observeAll()
+
+    fun observeDataStructures(): Flow<List<DataStructureEntity>> = db.dataStructureDao().observeAll()
+    fun searchDataStructures(query: String): Flow<List<DataStructureEntity>> = db.dataStructureDao().search(query)
+    suspend fun getDataStructure(id: Int): DataStructureEntity? = db.dataStructureDao().getById(id)
+    fun observeDataStructureFields(structureId: Int): Flow<List<DataStructureFieldEntity>> = db.dataStructureFieldDao().observeByStructure(structureId)
 }

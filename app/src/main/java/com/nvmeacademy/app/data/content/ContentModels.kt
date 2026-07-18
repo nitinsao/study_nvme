@@ -54,3 +54,19 @@ data class GlossarySeed(
     val term: String,
     val definition: String
 )
+
+data class StructureFieldSeed(
+    val range: String,
+    val fieldName: String,
+    val fieldDescription: String
+)
+
+data class DataStructureSeed(
+    val id: Int,
+    val order: Int,
+    val category: String, // "SQE", "CQE", or "Status"
+    val name: String,
+    val summary: String,
+    val source: String,
+    val fields: List<StructureFieldSeed>
+)
