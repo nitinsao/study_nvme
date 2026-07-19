@@ -21,6 +21,7 @@ import androidx.navigation.navArgument
 import androidx.navigation.NavType
 import com.nvmeacademy.app.ui.chapter.ChapterScreen
 import com.nvmeacademy.app.ui.commanddetail.CommandDetailScreen
+import com.nvmeacademy.app.ui.datastructure.DataStructureDetailScreen
 import com.nvmeacademy.app.ui.home.HomeScreen
 import com.nvmeacademy.app.ui.search.SearchScreen
 
@@ -29,10 +30,12 @@ sealed class Destination(val route: String, val label: String) {
     data object Search : Destination("search", "Reference")
     data object Chapter : Destination("chapter/{chapterId}", "Chapter")
     data object CommandDetail : Destination("command/{commandId}", "Command")
+    data object StructureDetail : Destination("structure/{structureId}", "Data Structure")
 
     companion object {
         fun chapterRoute(chapterId: Int) = "chapter/$chapterId"
         fun commandRoute(commandId: Int) = "command/$commandId"
+        fun structureRoute(structureId: Int) = "structure/$structureId"
     }
 }
 
@@ -86,9 +89,14 @@ fun NvmeAcademyNavHost() {
                 })
             }
             composable(Destination.Search.route) {
-                SearchScreen(onCommandClick = { commandId ->
-                    navController.navigate(Destination.commandRoute(commandId))
-                })
+                SearchScreen(
+                    onCommandClick = { commandId ->
+                        navController.navigate(Destination.commandRoute(commandId))
+                    },
+                    onStructureClick = { structureId ->
+                        navController.navigate(Destination.structureRoute(structureId))
+                    }
+                )
             }
             composable(
                 route = Destination.Chapter.route,
@@ -103,6 +111,13 @@ fun NvmeAcademyNavHost() {
             ) { backStackEntry ->
                 val commandId = backStackEntry.arguments?.getInt("commandId") ?: return@composable
                 CommandDetailScreen(commandId = commandId, onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = Destination.StructureDetail.route,
+                arguments = listOf(navArgument("structureId") { type = NavType.IntType })
+            ) { backStackEntry ->
+                val structureId = backStackEntry.arguments?.getInt("structureId") ?: return@composable
+                DataStructureDetailScreen(structureId = structureId, onBack = { navController.popBackStack() })
             }
         }
     }

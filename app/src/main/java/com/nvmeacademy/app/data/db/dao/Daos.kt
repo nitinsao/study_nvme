@@ -7,6 +7,8 @@ import androidx.room.Query
 import com.nvmeacademy.app.data.db.entities.ChapterEntity
 import com.nvmeacademy.app.data.db.entities.CommandEntity
 import com.nvmeacademy.app.data.db.entities.CommandFieldEntity
+import com.nvmeacademy.app.data.db.entities.DataStructureEntity
+import com.nvmeacademy.app.data.db.entities.DataStructureFieldEntity
 import com.nvmeacademy.app.data.db.entities.GlossaryEntity
 import com.nvmeacademy.app.data.db.entities.PartEntity
 import com.nvmeacademy.app.data.db.entities.SlideEntity
@@ -84,6 +86,36 @@ interface CommandFieldDao {
 
     @Query("SELECT * FROM command_fields WHERE commandId = :commandId ORDER BY `order` ASC")
     fun observeByCommand(commandId: Int): Flow<List<CommandFieldEntity>>
+}
+
+@Dao
+interface DataStructureDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(structures: List<DataStructureEntity>)
+
+    @Query("SELECT * FROM data_structures ORDER BY `order` ASC")
+    fun observeAll(): Flow<List<DataStructureEntity>>
+
+    @Query(
+        """
+        SELECT * FROM data_structures
+        WHERE name LIKE '%' || :query || '%' OR category LIKE '%' || :query || '%' OR summary LIKE '%' || :query || '%'
+        ORDER BY `order` ASC
+        """
+    )
+    fun search(query: String): Flow<List<DataStructureEntity>>
+
+    @Query("SELECT * FROM data_structures WHERE id = :id")
+    suspend fun getById(id: Int): DataStructureEntity?
+}
+
+@Dao
+interface DataStructureFieldDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(fields: List<DataStructureFieldEntity>)
+
+    @Query("SELECT * FROM data_structure_fields WHERE structureId = :structureId ORDER BY `order` ASC")
+    fun observeByStructure(structureId: Int): Flow<List<DataStructureFieldEntity>>
 }
 
 @Dao

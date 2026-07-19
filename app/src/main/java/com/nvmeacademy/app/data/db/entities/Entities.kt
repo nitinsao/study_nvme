@@ -68,3 +68,29 @@ data class GlossaryEntity(
     val term: String,
     val definition: String
 )
+
+/**
+ * A named, byte/Dword-precise data structure from the spec (e.g. "Command Dword 0",
+ * "Common Command Format", "Completion Queue Entry: DW 3") - distinct from the
+ * per-command Dword10-15 usage already covered in [CommandEntity]/[CommandFieldEntity].
+ */
+@Entity(tableName = "data_structures")
+data class DataStructureEntity(
+    @PrimaryKey val id: Int,
+    val order: Int,
+    val category: String, // "SQE", "CQE", or "Status"
+    val name: String,
+    val summary: String,
+    val sourceCitation: String
+)
+
+/** One row (a byte or bit range) of a [DataStructureEntity]. */
+@Entity(tableName = "data_structure_fields")
+data class DataStructureFieldEntity(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val structureId: Int,
+    val order: Int,
+    val range: String, // e.g. "31:16", "07:04", "63:60"
+    val fieldName: String,
+    val fieldDescription: String
+)
