@@ -2,6 +2,7 @@ package com.nvmeacademy.app
 
 import android.app.Application
 import com.nvmeacademy.app.data.db.AppDatabase
+import com.nvmeacademy.app.data.progress.ProgressStore
 import com.nvmeacademy.app.data.repository.ContentRepository
 
 class NvmeAcademyApp : Application() {
@@ -11,6 +12,6 @@ class NvmeAcademyApp : Application() {
     override fun onCreate() {
         super.onCreate()
         val db = AppDatabase.getInstance(this)
-        repository = ContentRepository(db)
+        repository = ContentRepository(db, ProgressStore(this))
     }
 }
