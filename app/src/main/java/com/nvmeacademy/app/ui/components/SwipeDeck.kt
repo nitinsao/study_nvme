@@ -10,9 +10,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.graphicsLayer
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.util.lerp
 import kotlin.math.absoluteValue
 
 /**
@@ -22,13 +22,12 @@ import kotlin.math.absoluteValue
  * than a flat carousel.
  */
 @OptIn(ExperimentalFoundationApi::class)
-fun Modifier.pagerCardTransform(pagerState: PagerState, page: Int): Modifier = this.graphicsLayer {
+fun Modifier.pagerCardTransform(pagerState: PagerState, page: Int): Modifier {
     val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction).absoluteValue
-    val clamped = pageOffset.coerceIn(0f, 1f)
-    val scale = lerp(0.88f, 1f, 1f - clamped)
-    scaleX = scale
-    scaleY = scale
-    alpha = lerp(0.4f, 1f, 1f - clamped)
+    val closeness = 1f - pageOffset.coerceIn(0f, 1f)
+    val scaleAmount = 0.88f + (1f - 0.88f) * closeness
+    val alphaAmount = 0.4f + (1f - 0.4f) * closeness
+    return this.scale(scaleAmount).alpha(alphaAmount)
 }
 
 /** A slim "position N of Total" indicator shown under a swipeable deck. */
