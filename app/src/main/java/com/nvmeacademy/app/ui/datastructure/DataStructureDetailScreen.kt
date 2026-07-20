@@ -16,7 +16,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -101,10 +100,12 @@ private fun StructureCardPage(structure: DataStructureEntity, modifier: Modifier
     val repository = LocalContentRepository.current
     val fields by repository.observeDataStructureFields(structure.id).collectAsStateWithLifecycle(initialValue = emptyList())
 
-    Card(
+    Surface(
         modifier = modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp),
         shape = RoundedCornerShape(24.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
+        shadowElevation = 6.dp
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
