@@ -1,6 +1,5 @@
 package com.nvmeacademy.app.ui.home
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,13 +10,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -26,11 +36,19 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nvmeacademy.app.data.LocalContentRepository
 import com.nvmeacademy.app.data.db.entities.ChapterEntity
 import com.nvmeacademy.app.data.db.entities.PartEntity
+import kotlinx.coroutines.launch
 
 @Composable
 fun HomeScreen(onChapterClick: (Int) -> Unit) {
     val repository = LocalContentRepository.current
     val parts by repository.observeParts().collectAsStateWithLifecycle(initialValue = emptyList())
+    val lastChapterId by repository.observeLastChapterId().collectAsStateWithLifecycle(initialValue = null)
+    val scope = rememberCoroutineScope()
+
+    var lastChapter by remember { mutableStateOf<ChapterEntity?>(null) }
+    LaunchedEffect(lastChapterId) {
+        lastChapter = lastChapterId?.let { repository.getChapter(it) }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -47,8 +65,73 @@ fun HomeScreen(onChapterClick: (Int) -> Unit) {
                 )
             }
         }
+        item {
+            ContinueLearningCard(
+                lastChapter = lastChapter,
+                onContinue = { lastChapterId?.let(onChapterClick) },
+                onStartOver = {
+                    scope.launch {
+                        repository.clearProgress()
+                        repository.getFirstChapterId()?.let(onChapterClick)
+                    }
+                }
+            )
+        }
         items(parts) { part ->
             PartSection(part = part, onChapterClick = onChapterClick)
+        }
+    }
+}
+
+@Composable
+private fun ContinueLearningCard(
+    lastChapter: ChapterEntity?,
+    onContinue: () -> Unit,
+    onStartOver: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            if (lastChapter != null) {
+                Text(
+                    "Continue where you left off",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    lastChapter.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(onClick = onContinue) {
+                        Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                        Text("Continue")
+                    }
+                    OutlinedButton(onClick = onStartOver) {
+                        Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                        Text("Start Over")
+                    }
+                }
+            } else {
+                Text(
+                    "Start learning",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    "Swipe through every topic from the basics to advanced spec detail.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
+                )
+                Button(onClick = onStartOver) {
+                    Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                    Text("Start Learning")
+                }
+            }
         }
     }
 }

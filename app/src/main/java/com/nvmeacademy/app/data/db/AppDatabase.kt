@@ -33,7 +33,7 @@ import com.nvmeacademy.app.data.db.entities.SlideEntity
         DataStructureFieldEntity::class,
         GlossaryEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

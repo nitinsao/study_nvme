@@ -37,8 +37,24 @@ interface ChapterDao {
     @Query("SELECT * FROM chapters WHERE id = :chapterId")
     suspend fun getById(chapterId: Int): ChapterEntity?
 
-    @Query("SELECT * FROM chapters ORDER BY `order` ASC")
-    fun observeAll(): Flow<List<ChapterEntity>>
+    @Query(
+        """
+        SELECT chapters.* FROM chapters
+        JOIN parts ON chapters.partId = parts.id
+        ORDER BY parts.`order` ASC, chapters.`order` ASC
+        """
+    )
+    fun observeAllOrderedGlobally(): Flow<List<ChapterEntity>>
+
+    @Query(
+        """
+        SELECT chapters.id FROM chapters
+        JOIN parts ON chapters.partId = parts.id
+        ORDER BY parts.`order` ASC, chapters.`order` ASC
+        LIMIT 1
+        """
+    )
+    suspend fun getFirstChapterId(): Int?
 }
 
 @Dao
@@ -48,6 +64,16 @@ interface SlideDao {
 
     @Query("SELECT * FROM slides WHERE chapterId = :chapterId ORDER BY `order` ASC")
     fun observeByChapter(chapterId: Int): Flow<List<SlideEntity>>
+
+    @Query(
+        """
+        SELECT slides.* FROM slides
+        JOIN chapters ON slides.chapterId = chapters.id
+        JOIN parts ON chapters.partId = parts.id
+        ORDER BY parts.`order` ASC, chapters.`order` ASC, slides.`order` ASC
+        """
+    )
+    fun observeAllOrderedGlobally(): Flow<List<SlideEntity>>
 }
 
 @Dao

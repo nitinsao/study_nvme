@@ -13,9 +13,20 @@ import com.nvmeacademy.app.data.db.entities.DataStructureFieldEntity
 import com.nvmeacademy.app.data.db.entities.GlossaryEntity
 import com.nvmeacademy.app.data.db.entities.PartEntity
 import com.nvmeacademy.app.data.db.entities.SlideEntity
+import com.nvmeacademy.app.data.progress.ProgressStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 
-class ContentRepository(private val db: AppDatabase) {
+/** One swipeable card in the Learn deck: a slide plus the chapter/part it belongs to. */
+data class DeckCard(
+    val slide: SlideEntity,
+    val chapter: ChapterEntity,
+    val partTitle: String,
+    val position: Int,
+    val total: Int
+)
+
+class ContentRepository(private val db: AppDatabase, private val progressStore: ProgressStore) {
 
     suspend fun seedIfEmpty() {
         if (db.partDao().count() > 0) return
@@ -36,13 +47,18 @@ class ContentRepository(private val db: AppDatabase) {
                     level = chapterSeed.level
                 )
                 for (slideSeed in chapterSeed.slides) {
+                    val diagram = slideSeed.diagram
                     slides += SlideEntity(
                         chapterId = chapterSeed.id,
                         order = slideSeed.order,
                         title = slideSeed.title,
                         bulletPoints = slideSeed.bullets.joinToString("\n"),
                         detailedNotes = slideSeed.notes,
-                        sourceCitation = slideSeed.source
+                        sourceCitation = slideSeed.source,
+                        diagramCaption = diagram?.caption.orEmpty(),
+                        diagramOrientation = diagram?.orientation ?: "H",
+                        diagramConnector = diagram?.connector ?: "arrow",
+                        diagramSteps = diagram?.steps.orEmpty().joinToString("\n") { "${it.label}::${it.sublabel}::${it.weight}" }
                     )
                 }
             }
@@ -98,6 +114,31 @@ class ContentRepository(private val db: AppDatabase) {
     fun observeChaptersByPart(partId: Int): Flow<List<ChapterEntity>> = db.chapterDao().observeByPart(partId)
     suspend fun getChapter(chapterId: Int): ChapterEntity? = db.chapterDao().getById(chapterId)
     fun observeSlides(chapterId: Int): Flow<List<SlideEntity>> = db.slideDao().observeByChapter(chapterId)
+
+    /** The full Learn deck (every slide across every chapter/part) in reading order. */
+    fun observeDeck(): Flow<List<DeckCard>> = combine(
+        db.chapterDao().observeAllOrderedGlobally(),
+        db.slideDao().observeAllOrderedGlobally(),
+        db.partDao().observeAll()
+    ) { chapters, slides, parts ->
+        val chapterById = chapters.associateBy { it.id }
+        val partTitleById = parts.associateBy({ it.id }, { it.title })
+        slides.mapIndexedNotNull { index, slide ->
+            val chapter = chapterById[slide.chapterId] ?: return@mapIndexedNotNull null
+            DeckCard(
+                slide = slide,
+                chapter = chapter,
+                partTitle = partTitleById[chapter.partId].orEmpty(),
+                position = index + 1,
+                total = slides.size
+            )
+        }
+    }
+
+    suspend fun getFirstChapterId(): Int? = db.chapterDao().getFirstChapterId()
+    fun observeLastChapterId(): Flow<Int?> = progressStore.lastChapterId
+    suspend fun saveLastChapter(chapterId: Int) = progressStore.saveLastChapter(chapterId)
+    suspend fun clearProgress() = progressStore.clear()
 
     fun searchCommands(query: String): Flow<List<CommandEntity>> = db.commandDao().search(query)
     fun observeAllCommands(): Flow<List<CommandEntity>> = db.commandDao().observeAll()

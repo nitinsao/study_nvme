@@ -16,7 +16,15 @@ private val DarkColors = darkColorScheme(
     secondary = NvmeCyan,
     tertiary = NvmeAmber,
     background = Color(0xFF0B0F14),
-    surface = Color(0xFF11161D),
+    surface = Color(0xFF0D1117),
+    surfaceVariant = Color(0xFF161D26),
+    onSurface = Color(0xFFE6EAF0),
+    onSurfaceVariant = Color(0xFFC7D0DC),
+    onBackground = Color(0xFFE6EAF0),
+    primaryContainer = Color(0xFF1B2733),
+    onPrimaryContainer = Color(0xFFCFE6FF),
+    secondaryContainer = Color(0xFF15242A),
+    onSecondaryContainer = Color(0xFFB8E7EF),
 )
 
 private val LightColors = lightColorScheme(
