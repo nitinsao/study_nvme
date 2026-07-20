@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nvmeacademy.app.data.LocalContentRepository
 import com.nvmeacademy.app.data.repository.DeckCard
+import com.nvmeacademy.app.ui.components.ChapterDiagram
 import com.nvmeacademy.app.ui.components.DeckPositionIndicator
 import com.nvmeacademy.app.ui.components.pagerCardTransform
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -138,6 +139,16 @@ private fun DeckCardPage(card: DeckCard, modifier: Modifier = Modifier) {
             }
             item {
                 Text(card.slide.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            }
+            if (card.slide.diagramCaption.isNotBlank()) {
+                item {
+                    ChapterDiagram(
+                        caption = card.slide.diagramCaption,
+                        orientation = card.slide.diagramOrientation,
+                        connector = card.slide.diagramConnector,
+                        stepsRaw = card.slide.diagramSteps
+                    )
+                }
             }
             items(bullets) { bullet ->
                 Row(verticalAlignment = Alignment.Top) {

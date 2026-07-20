@@ -47,13 +47,18 @@ class ContentRepository(private val db: AppDatabase, private val progressStore: 
                     level = chapterSeed.level
                 )
                 for (slideSeed in chapterSeed.slides) {
+                    val diagram = slideSeed.diagram
                     slides += SlideEntity(
                         chapterId = chapterSeed.id,
                         order = slideSeed.order,
                         title = slideSeed.title,
                         bulletPoints = slideSeed.bullets.joinToString("\n"),
                         detailedNotes = slideSeed.notes,
-                        sourceCitation = slideSeed.source
+                        sourceCitation = slideSeed.source,
+                        diagramCaption = diagram?.caption.orEmpty(),
+                        diagramOrientation = diagram?.orientation ?: "H",
+                        diagramConnector = diagram?.connector ?: "arrow",
+                        diagramSteps = diagram?.steps.orEmpty().joinToString("\n") { "${it.label}::${it.sublabel}::${it.weight}" }
                     )
                 }
             }

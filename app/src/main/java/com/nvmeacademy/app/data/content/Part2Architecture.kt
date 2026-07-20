@@ -70,7 +70,17 @@ object Part2Architecture {
                         "Every controller always has exactly one Admin SQ/CQ pair; I/O Queues are created/deleted on top of that."
                     ),
                     notes = """NVMe's entire command path rests on one mechanism: a Submission Queue (SQ), where the host places commands, paired with a Completion Queue (CQ), where the controller places results. Both are circular buffers of fixed-size slots (64 bytes per SQE) tracked with Head and Tail pointers; a queue is Empty when Head equals Tail, and Full when Head equals one more than Tail. On PCIe, after writing new commands the host writes the SQ Tail Doorbell register; after consuming completions, it writes the CQ Head Doorbell register. Rather than polling for new completions, the host watches the Phase Tag (P) bit inside each CQE: the controller inverts this bit's expected value every time it posts a new entry, and flips it again on the next full pass, so a host can tell "new" entries apart from stale leftovers purely by comparing against the expected phase. PCIe's memory-based model allows many Submission Queues to feed into one shared Completion Queue, while NVMe over Fabrics enforces a strict 1:1 SQ-to-CQ pairing. A host must create Completion Queues before their associated Submission Queues, and must delete Submission Queues before deleting their Completion Queue.""",
-                    source = "NVMe Base Spec 2.3 §2.1, §3.3, §4.2.4"
+                    source = "NVMe Base Spec 2.3 §2.1, §3.3, §4.2.4",
+                    diagram = ChapterDiagramSeed(
+                        caption = "One round trip through the queues",
+                        steps = listOf(
+                            DiagramStepSeed("Host writes", "command to SQ"),
+                            DiagramStepSeed("Rings doorbell"),
+                            DiagramStepSeed("Controller fetches", "& executes"),
+                            DiagramStepSeed("Posts to CQ"),
+                            DiagramStepSeed("Host reads", "completion")
+                        )
+                    )
                 ))
             ),
             ChapterSeed(
@@ -112,7 +122,17 @@ object Part2Architecture {
                         "A controller is \"safe to power off\" only once CSTS.SHST reads 10b for the relevant scope."
                     ),
                     notes = """Over PCIe, the host waits for CSTS.RDY to read '0', configures the Admin Queue Attributes (AQA) plus Admin SQ/CQ base addresses (ASQ/ACQ), sets controller configuration bits, and only then sets CC.EN to '1' and waits for CSTS.RDY to flip to '1'. It then uses Identify to learn capabilities and creates I/O Completion Queues before I/O Submission Queues. Fabrics initialization starts with a Fabrics Connect command before any property configuration happens. The spec defines two "controller ready" modes: in "Ready With Media," by the moment CSTS.RDY flips to '1' the controller and all namespaces are fully able to process commands; in "Ready Independent of Media," CSTS.RDY can flip to '1' before media is ready - commands may be aborted with "Namespace Not Ready" for up to CRTO.CRWMT while media initialization finishes in the background. Shutdown mirrors initialization in reverse: normal shutdown (CC.SHN=01b) drains outstanding I/O gracefully; abrupt shutdown (CC.SHN=10b) stops immediately. CSTS.SHST progresses from 00b through 01b to 10b (safe to remove power). An NVM Subsystem Shutdown can cascade across every controller in a domain or subsystem from one control point.""",
-                    source = "NVMe Base Spec 2.3 §3.5, §3.6"
+                    source = "NVMe Base Spec 2.3 §3.5, §3.6",
+                    diagram = ChapterDiagramSeed(
+                        caption = "PCIe controller initialization",
+                        steps = listOf(
+                            DiagramStepSeed("CSTS.RDY = 0", "wait for reset"),
+                            DiagramStepSeed("Configure", "AQA / ASQ / ACQ"),
+                            DiagramStepSeed("CC.EN = 1"),
+                            DiagramStepSeed("CSTS.RDY = 1", "controller ready"),
+                            DiagramStepSeed("Identify", "+ create I/O queues")
+                        )
+                    )
                 ))
             ),
             ChapterSeed(
@@ -177,7 +197,15 @@ object Part2Architecture {
                         "Never interleave two firmware/boot-partition update sequences - behavior in that case is explicitly undefined."
                     ),
                     notes = """Updating firmware is a small state machine built from two Admin commands. First, the host issues one or more Firmware Image Download commands, each carrying a chunk of the new image at a specified byte offset, following the Firmware Update Granularity from Identify Controller; the resulting image must have no gaps, no overlaps, and must start at offset zero. Once fully downloaded, the host issues Firmware Commit, which verifies the image and commits it into a chosen firmware slot. Activation can happen "by reset" (the new image takes effect after a later Controller Level Reset, or in some cases requires a Conventional or NVM Subsystem Reset) or "without reset" (Commit Action 011b activates immediately, emitting a "Firmware Activation Starting" event first if enabled). Failure modes are well defined: an invalid image aborts with "Invalid Firmware Image"; if activation genuinely requires a reset the controller didn't get, it reports exactly which reset type is needed. If a downloaded image fails to load at boot, the controller falls back to the most recently active image and raises a Firmware Image Load Error event. The spec is explicit that a host should never interleave commands from two separate firmware/boot-partition update sequences.""",
-                    source = "NVMe Base Spec 2.3 §3.11"
+                    source = "NVMe Base Spec 2.3 §3.11",
+                    diagram = ChapterDiagramSeed(
+                        caption = "Firmware update lifecycle",
+                        steps = listOf(
+                            DiagramStepSeed("Firmware Image Download", "stage the image"),
+                            DiagramStepSeed("Firmware Commit", "verify + place in slot"),
+                            DiagramStepSeed("Activate", "at reset, or immediately")
+                        )
+                    )
                 ))
             ),
             ChapterSeed(
@@ -202,7 +230,19 @@ object Part2Architecture {
                         "For the exact byte map of every Dword - including the Vendor Specific and Fabrics variants - see the Structures tab in the Reference section."
                     ),
                     notes = """Every SQE - Admin, I/O, or Fabrics - is exactly 64 bytes. The first four bytes are Command Dword 0 (CDW0): bits 07:00 are the Opcode (whose low two bits are the Data Transfer Direction); bits 09:08 are FUSE (Fused Operation); bits 15:14 are PSDT, selecting whether the Data Pointer should be interpreted as PRP entries (00b) or an SGL entry; bits 31:16 are the Command Identifier (CID), a host-assigned tag used to match a completion back to its command. Bytes 07:04 hold the Namespace Identifier (NSID), cleared to 0h if unused. Bytes 11:08 (Command Dword 2) and 15:12 (Command Dword 3) are reserved by most commands but available for command-specific use. Bytes 23:16 are the Metadata Pointer (MPTR). Bytes 39:24 are the Data Pointer (DPTR): if PSDT is 00b, this holds PRP Entry 1 and PRP Entry 2; if PSDT is 01b/10b, the same bytes hold the first SGL segment descriptor. Bytes 43:40 through 63:60 are Command Dwords 10 through 15 (CDW10-CDW15) - six dwords whose meaning is entirely defined by the specific command's opcode. An optional Vendor Specific command format (used only if a controller supports it) replaces CDW10/CDW11 with explicit Number of Dwords in Data Transfer (NDT) and Number of Dwords in Metadata Transfer (NDM) fields. Fabrics commands share the same CDW0 layout conceptually but fix Opcode to 7Fh, fix FUSE to 00b (no fused Fabrics commands exist), and add a Fabrics Command Type (FCTYPE) field in place of the generic byte range used elsewhere. The Reference tab's Structures list has the exact byte-by-byte layout for all of these variants if you need to look one up precisely.""",
-                    source = "NVMe Base Spec 2.3 §4.1, Figures 91-95"
+                    source = "NVMe Base Spec 2.3 §4.1, Figures 91-95",
+                    diagram = ChapterDiagramSeed(
+                        caption = "64-byte SQE byte map (Common Command Format)",
+                        connector = "none",
+                        steps = listOf(
+                            DiagramStepSeed("CDW0", "4B", 4f),
+                            DiagramStepSeed("NSID", "4B", 4f),
+                            DiagramStepSeed("CDW2/3", "8B", 8f),
+                            DiagramStepSeed("MPTR", "8B", 8f),
+                            DiagramStepSeed("DPTR", "16B", 16f),
+                            DiagramStepSeed("CDW10-15", "24B", 24f)
+                        )
+                    )
                 ))
             ),
             ChapterSeed(
@@ -225,7 +265,17 @@ object Part2Architecture {
                         "For the exact byte map of both CQE layouts and the full Status Field, see the Structures tab in the Reference section."
                     ),
                     notes = """A completion queue entry tells the host everything it needs to know about a finished command, in at least 16 bytes across four dwords. Dword 0 and Dword 1 are command-specific: most leave them reserved, but some (Create I/O Completion Queue, Identify) return meaningful data there. Dword 2 is standardized: bits 31:16 are the SQ Identifier (SQID) and bits 15:00 are the SQ Head Pointer (SQHD), which the host uses to know which SQ slots have been freed - SQID is reserved over NVMe over Fabrics. Dword 3 carries the fields developers reach for constantly: bit 31 is Do Not Retry (DNR), bit 30 is More (M, additional detail via the Error Information log page), bits 29:28 are Command Retry Delay (CRD), bits 27:25 are Status Code Type (SCT), bits 24:17 are Status Code (SC), bit 16 is the Phase Tag (P, also reserved over Fabrics), and bits 15:00 are the Command Identifier (CID). SCT is the "which table do I look this up in" field: 0h Generic Command Status, 1h Command Specific Status, 2h Media and Data Integrity Errors, 3h Path Related Status; 4h-6h reserved, 7h vendor-specific. Fabrics commands don't reuse this exact CQE shape - they use their own Fabrics Response format with Fabrics Response Type Specific bytes, SQ Head Pointer, Command Identifier, and a 15-bit Status field carrying the same Status Code, just packed differently. The Reference tab's Structures list has the precise byte-by-byte layout for both, plus the full Status Field breakdown.""",
-                    source = "NVMe Base Spec 2.3 §4.2, Figures 96-100"
+                    source = "NVMe Base Spec 2.3 §4.2, Figures 96-100",
+                    diagram = ChapterDiagramSeed(
+                        caption = "16-byte CQE byte map (Common layout)",
+                        connector = "none",
+                        steps = listOf(
+                            DiagramStepSeed("DW0", "command specific", 1f),
+                            DiagramStepSeed("DW1", "command specific", 1f),
+                            DiagramStepSeed("DW2", "SQID + SQHD", 1f),
+                            DiagramStepSeed("DW3", "Status + P + CID", 1f)
+                        )
+                    )
                 ))
             ),
             ChapterSeed(
