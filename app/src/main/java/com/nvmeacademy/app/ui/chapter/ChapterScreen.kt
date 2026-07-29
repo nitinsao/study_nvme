@@ -18,6 +18,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -44,7 +46,9 @@ import com.nvmeacademy.app.data.LocalContentRepository
 import com.nvmeacademy.app.data.repository.DeckCard
 import com.nvmeacademy.app.ui.components.ChapterDiagram
 import com.nvmeacademy.app.ui.components.DeckPositionIndicator
+import com.nvmeacademy.app.ui.components.TtsController
 import com.nvmeacademy.app.ui.components.pagerCardTransform
+import com.nvmeacademy.app.ui.components.rememberTtsController
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
@@ -72,6 +76,7 @@ fun ChapterScreen(chapterId: Int, onBack: () -> Unit) {
 
     val startIndex = remember(deck) { deck.indexOfFirst { it.chapter.id == chapterId }.coerceAtLeast(0) }
     val pagerState = rememberPagerState(initialPage = startIndex, pageCount = { deck.size })
+    val tts = rememberTtsController()
 
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.settledPage }
@@ -79,6 +84,12 @@ fun ChapterScreen(chapterId: Int, onBack: () -> Unit) {
             .collect { page ->
                 deck.getOrNull(page)?.let { repository.saveLastChapter(it.chapter.id) }
             }
+    }
+
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.currentPage }
+            .distinctUntilChanged()
+            .collect { tts.stop() }
     }
 
     val current = deck[pagerState.currentPage]
@@ -99,6 +110,7 @@ fun ChapterScreen(chapterId: Int, onBack: () -> Unit) {
             ) { page ->
                 DeckCardPage(
                     card = deck[page],
+                    tts = tts,
                     modifier = Modifier.pagerCardTransform(pagerState, page)
                 )
             }
@@ -115,9 +127,14 @@ private fun BackIcon(onBack: () -> Unit) {
 }
 
 @Composable
-private fun DeckCardPage(card: DeckCard, modifier: Modifier = Modifier) {
+private fun DeckCardPage(card: DeckCard, tts: TtsController, modifier: Modifier = Modifier) {
     var showNotes by remember(card.slide.id) { mutableStateOf(false) }
     val bullets = remember(card.slide) { card.slide.bulletPoints.split("\n").filter { it.isNotBlank() } }
+
+    val chapterUtteranceId = "chapter-${card.slide.id}"
+    val notesUtteranceId = "notes-${card.slide.id}"
+    val isSpeakingChapter = tts.speakingId == chapterUtteranceId
+    val isSpeakingNotes = tts.speakingId == notesUtteranceId
 
     Surface(
         modifier = modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -132,7 +149,26 @@ private fun DeckCardPage(card: DeckCard, modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item {
-                LevelBadge(level = card.chapter.level)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    LevelBadge(level = card.chapter.level)
+                    IconButton(onClick = {
+                        val text = buildString {
+                            append(card.chapter.title).append(". ")
+                            append(card.slide.title).append(". ")
+                            append(bullets.joinToString(". "))
+                        }
+                        tts.speak(chapterUtteranceId, text)
+                    }) {
+                        Icon(
+                            imageVector = if (isSpeakingChapter) Icons.Filled.Stop else Icons.Filled.VolumeUp,
+                            contentDescription = if (isSpeakingChapter) "Stop listening" else "Listen to this chapter"
+                        )
+                    }
+                }
             }
             item {
                 Text(card.chapter.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -163,12 +199,24 @@ private fun DeckCardPage(card: DeckCard, modifier: Modifier = Modifier) {
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        TextButton(onClick = { showNotes = !showNotes }) {
-                            Text(if (showNotes) "Hide detailed notes" else "Show detailed notes")
-                            Icon(
-                                imageVector = if (showNotes) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                                contentDescription = null
-                            )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(onClick = { showNotes = !showNotes }) {
+                                Text(if (showNotes) "Hide detailed notes" else "Show detailed notes")
+                                Icon(
+                                    imageVector = if (showNotes) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                                    contentDescription = null
+                                )
+                            }
+                            IconButton(onClick = { tts.speak(notesUtteranceId, card.slide.detailedNotes) }) {
+                                Icon(
+                                    imageVector = if (isSpeakingNotes) Icons.Filled.Stop else Icons.Filled.VolumeUp,
+                                    contentDescription = if (isSpeakingNotes) "Stop listening" else "Listen to detailed notes"
+                                )
+                            }
                         }
                         AnimatedVisibility(visible = showNotes) {
                             Column {
