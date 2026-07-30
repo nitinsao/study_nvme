@@ -140,6 +140,9 @@ class ContentRepository(private val db: AppDatabase, private val progressStore: 
     suspend fun saveLastChapter(chapterId: Int) = progressStore.saveLastChapter(chapterId)
     suspend fun clearProgress() = progressStore.clear()
 
+    fun observeNarrationVoiceName(): Flow<String?> = progressStore.narrationVoiceName
+    suspend fun saveNarrationVoice(voiceName: String) = progressStore.saveNarrationVoice(voiceName)
+
     fun searchCommands(query: String): Flow<List<CommandEntity>> = db.commandDao().search(query)
     fun observeAllCommands(): Flow<List<CommandEntity>> = db.commandDao().observeAll()
     suspend fun getCommand(id: Int): CommandEntity? = db.commandDao().getById(id)

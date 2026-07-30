@@ -23,17 +23,30 @@ private val SPEECH_ABBREVIATIONS: List<Pair<Regex, String>> = listOf(
     "&" to "and"
 ).map { (pattern, replacement) -> Regex(pattern, RegexOption.IGNORE_CASE) to replacement }
 
-/** "1:1" / "31:16" style ratios and bit-ranges read naturally as "1 to 1" / "31 to 16". */
-private val RATIO_OR_RANGE_COLON = Regex("(\\d+)\\s*:\\s*(\\d+)")
+/**
+ * "bits 31:16" / "CDW10 31:16" style bit- or byte-ranges: the spec writes
+ * these high:low, but that reads naturally low-to-high, e.g. "16 till 31".
+ */
+private val BIT_RANGE_COLON = Regex(
+    "\\b(bits?|bytes?|CDW\\d+|DW\\d+)\\s+(\\d+)\\s*:\\s*(\\d+)\\b",
+    RegexOption.IGNORE_CASE
+)
+
+/** Anything else shaped like "1:1" is a ratio, read in its given order as "1 to 1". */
+private val RATIO_COLON = Regex("(\\d+)\\s*:\\s*(\\d+)")
 
 /**
  * Rewrites spec prose into something a TTS engine reads naturally: expands
- * common abbreviations it tends to spell out letter-by-letter, turns
- * digit:digit into "digit to digit" (ratios and bit-ranges alike), and
- * demotes any other colon to a comma-length pause instead of silence.
+ * common abbreviations it tends to spell out letter-by-letter, distinguishes
+ * bit/byte-range colons (spoken low-to-high, "till") from ratio colons
+ * (spoken in order, "to"), and demotes any other colon to a comma-length
+ * pause instead of silence.
  */
 internal fun normalizeForSpeech(raw: String): String {
-    var text = RATIO_OR_RANGE_COLON.replace(raw) { match ->
+    var text = BIT_RANGE_COLON.replace(raw) { match ->
+        "${match.groupValues[1]} ${match.groupValues[3]} till ${match.groupValues[2]}"
+    }
+    text = RATIO_COLON.replace(text) { match ->
         "${match.groupValues[1]} to ${match.groupValues[2]}"
     }
     for ((pattern, replacement) in SPEECH_ABBREVIATIONS) {
@@ -42,45 +55,62 @@ internal fun normalizeForSpeech(raw: String): String {
     return text.replace(":", ",")
 }
 
+/** A human-readable quality tier for a [Voice], for a voice-picker UI. */
+fun voiceQualityLabel(voice: Voice): String = when {
+    voice.quality >= Voice.QUALITY_VERY_HIGH -> "Very high quality"
+    voice.quality >= Voice.QUALITY_HIGH -> "High quality"
+    voice.quality >= Voice.QUALITY_NORMAL -> "Normal quality"
+    else -> "Low quality"
+}
+
+/** A friendly label for a [Voice]: its language/region plus a quality hint. */
+fun voiceDisplayLabel(voice: Voice): String {
+    val locale = voice.locale.displayName.ifBlank { voice.locale.toString() }
+    val network = if (voice.isNetworkConnectionRequired) " · needs network" else ""
+    return "$locale — ${voiceQualityLabel(voice)}$network"
+}
+
 /**
  * Thin wrapper around [TextToSpeech] that auto-selects the highest quality
- * installed voice for narration, and tracks which utterance (if any) is
- * currently speaking so "Listen" buttons can flip to a stop state.
+ * installed voice for narration (or a user-chosen one), and tracks which
+ * utterance (if any) is currently speaking so "Listen" buttons can flip to
+ * a stop state.
  */
 class TtsController(context: Context) {
     private var engine: TextToSpeech? = null
+    private var ready = false
+    private var pendingVoiceName: String? = null
 
     var speakingId by mutableStateOf<String?>(null)
         private set
 
+    /** Every installed voice for the device's language, best quality first. */
+    var availableVoices by mutableStateOf<List<Voice>>(emptyList())
+        private set
+
+    var selectedVoiceName by mutableStateOf<String?>(null)
+        private set
+
     init {
         engine = TextToSpeech(context.applicationContext) { status ->
-            if (status == TextToSpeech.SUCCESS) configureBestVoice()
+            if (status == TextToSpeech.SUCCESS) onEngineReady()
         }
     }
 
     private fun installed(voice: Voice) =
         !voice.features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED)
 
-    private fun configureBestVoice() {
+    private fun onEngineReady() {
         val tts = engine ?: return
         val deviceLocale = Locale.getDefault()
-        val allVoices = tts.voices.orEmpty()
+        val allVoices = tts.voices.orEmpty().filter(::installed)
+        val sameLanguage = allVoices.filter { it.locale.language == deviceLocale.language }
 
-        val sameLanguage = allVoices.filter { installed(it) && it.locale.language == deviceLocale.language }
-        val pool = sameLanguage.ifEmpty { allVoices.filter(::installed) }
-
-        val best = pool.sortedWith(
+        availableVoices = (sameLanguage.ifEmpty { allVoices }).sortedWith(
             compareByDescending<Voice> { it.locale.country == deviceLocale.country }
-                .thenByDescending { !it.isNetworkConnectionRequired }
                 .thenByDescending { it.quality }
-        ).firstOrNull()
+        )
 
-        if (best != null) {
-            tts.setVoice(best)
-        } else {
-            tts.setLanguage(Locale.US)
-        }
         tts.setSpeechRate(1.0f)
         tts.setPitch(1.0f)
         tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
@@ -97,6 +127,45 @@ class TtsController(context: Context) {
                 if (speakingId == utteranceId) speakingId = null
             }
         })
+
+        ready = true
+        val requested = pendingVoiceName
+        if (requested != null && applyVoiceByName(requested)) return
+        applyBestVoice()
+    }
+
+    private fun applyBestVoice() {
+        val tts = engine ?: return
+        val best = availableVoices.firstOrNull()
+        if (best != null) {
+            tts.setVoice(best)
+            selectedVoiceName = best.name
+        } else {
+            tts.setLanguage(Locale.US)
+        }
+    }
+
+    private fun applyVoiceByName(name: String): Boolean {
+        val tts = engine ?: return false
+        val match = availableVoices.firstOrNull { it.name == name } ?: return false
+        tts.setVoice(match)
+        selectedVoiceName = match.name
+        return true
+    }
+
+    /** Applies a remembered voice preference (e.g. loaded from disk); falls back to auto-pick if not found. */
+    fun useVoicePreference(name: String?) {
+        if (!ready) {
+            pendingVoiceName = name
+            return
+        }
+        if (name == null || !applyVoiceByName(name)) applyBestVoice()
+    }
+
+    /** User-driven pick from [availableVoices], e.g. via a voice-picker dialog. */
+    fun selectVoice(voice: Voice) {
+        engine?.setVoice(voice)
+        selectedVoiceName = voice.name
     }
 
     /** Speaking the same [id] again while it's already playing stops it instead (toggle behavior). */
