@@ -13,6 +13,35 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import java.util.Locale
 
+/** Abbreviations the spec prose uses that a TTS engine otherwise spells out letter-by-letter. */
+private val SPEECH_ABBREVIATIONS: List<Pair<Regex, String>> = listOf(
+    "\\bi\\.e\\.,?" to "that is",
+    "\\be\\.g\\.,?" to "for example",
+    "\\betc\\." to "et cetera",
+    "\\bvs\\.?\\b" to "versus",
+    "\\bFigs?\\.\\s*" to "Figure ",
+    "&" to "and"
+).map { (pattern, replacement) -> Regex(pattern, RegexOption.IGNORE_CASE) to replacement }
+
+/** "1:1" / "31:16" style ratios and bit-ranges read naturally as "1 to 1" / "31 to 16". */
+private val RATIO_OR_RANGE_COLON = Regex("(\\d+)\\s*:\\s*(\\d+)")
+
+/**
+ * Rewrites spec prose into something a TTS engine reads naturally: expands
+ * common abbreviations it tends to spell out letter-by-letter, turns
+ * digit:digit into "digit to digit" (ratios and bit-ranges alike), and
+ * demotes any other colon to a comma-length pause instead of silence.
+ */
+internal fun normalizeForSpeech(raw: String): String {
+    var text = RATIO_OR_RANGE_COLON.replace(raw) { match ->
+        "${match.groupValues[1]} to ${match.groupValues[2]}"
+    }
+    for ((pattern, replacement) in SPEECH_ABBREVIATIONS) {
+        text = pattern.replace(text, replacement)
+    }
+    return text.replace(":", ",")
+}
+
 /**
  * Thin wrapper around [TextToSpeech] that auto-selects the highest quality
  * installed voice for narration, and tracks which utterance (if any) is
@@ -77,7 +106,7 @@ class TtsController(context: Context) {
             stop()
             return
         }
-        tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, id)
+        tts.speak(normalizeForSpeech(text), TextToSpeech.QUEUE_FLUSH, null, id)
     }
 
     fun stop() {
