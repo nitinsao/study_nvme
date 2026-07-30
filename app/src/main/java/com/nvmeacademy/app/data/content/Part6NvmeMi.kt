@@ -25,7 +25,15 @@ object Part6NvmeMi {
                         "Key capabilities: discovery, health/temperature monitoring, VPD (asset data) read/write, enclosure element control (fans, power, LEDs via SES), and secure out-of-band access that preserves data-at-rest security."
                     ),
                     notes = """NVMe-MI's scope statement frames it as defining "an architecture and command set for out-of-band and in-band management of an NVMe Storage Device as well as an architecture and mechanisms for monitoring and controlling the elements of an NVMe Enclosure." For Storage Devices this includes discovery/capability negotiation, storing host-environment data for later query, health/temperature monitoring, multiple concurrent commands (so a slow command can't block monitoring), a host-agnostic out-of-band mechanism, a standard VPD format, and preserving data-at-rest security. For Enclosures it adds discovering enclosures/capabilities, managing/sensing enclosure elements (power supplies, cooling, displays, indicators), and discovering which storage devices occupy which enclosure slots.""",
-                    source = "MI Spec 2.1 §1 (Introduction)"
+                    source = "MI Spec 2.1 §1 (Introduction)",
+                    diagram = ChapterDiagramSeed(
+                        caption = "Two management paths, same device",
+                        connector = "none",
+                        steps = listOf(
+                            DiagramStepSeed("Out-of-Band", "BMC <-> MCTP <-> Device"),
+                            DiagramStepSeed("In-Band Tunneling", "Host -> NVMe-MI Send/Receive")
+                        )
+                    )
                 ))
             ),
             ChapterSeed(
@@ -45,7 +53,16 @@ object Part6NvmeMi {
                         "Message size limits: max NVMe-MI Message out-of-band is 4,224 bytes (4 KiB + 128 B) split across MCTP packets; in-band tunneling instead caps at the NVMe Maximum Data Transfer Size."
                     ),
                     notes = """The physical layer is the concrete "wiring" story underneath everything else. PCIe VDM reuses the same physical link the host uses for I/O, layering MCTP messages as vendor-defined messages - attractive when a BMC has PCIe visibility but no separate management fabric. The 2-Wire (SMBus/I2C/I3C) path is the classic "sideband" seen in servers and JBOFs: a dedicated low-speed bus wired to a BMC that keeps working even if the PCIe link or host is down. Understanding this chapter is prerequisite to everything else because message size limits (4,224 B for out-of-band vs MDTS for in-band) directly explain why big structures like SES pages or large data structures need the Management Endpoint Buffer commands as a workaround.""",
-                    source = "MI Spec 2.1 §2, §3"
+                    source = "MI Spec 2.1 §2, §3",
+                    diagram = ChapterDiagramSeed(
+                        caption = "Out-of-band transport path",
+                        steps = listOf(
+                            DiagramStepSeed("Management Controller", "e.g. a BMC"),
+                            DiagramStepSeed("MCTP"),
+                            DiagramStepSeed("PCIe VDM", "or SMBus/I2C/I3C"),
+                            DiagramStepSeed("Management Endpoint")
+                        )
+                    )
                 ))
             ),
             ChapterSeed(

@@ -47,7 +47,16 @@ object Part4NvmIoCommands {
                         "Copy commands are checked twice: each source namespace as if by a Read, the destination namespace as if by a Write - so a Copy can conflict on either side independently."
                     ),
                     notes = """Persistent Reservations solve the classic clustered-storage problem: several hosts (e.g., nodes in a failover cluster) attach to the same namespace, but only the current cluster owner should be allowed to write, while standbys might still need read access, or fenced nodes need to be locked out entirely. Reservation Register establishes a "membership card" (a reservation key) for a host without granting any access rights by itself. Reservation Acquire then either creates the reservation (if none exists) or, using a supplied Preempt Reservation Key, forcibly displaces whoever currently holds it - with the "Preempt and Abort" variant also aborting that displaced host's in-flight commands, which is what makes fast, safe cluster failover possible. The six reservation types trade off exclusivity for shared-read convenience: "Write Exclusive" types let non-holders still read; "Exclusive Access" types lock out non-holders from both; the "Registrants Only" and "All Registrants" suffixes broaden who is treated as allowed beyond just the single current holder. Reservation Report's Generation counter is the idiomatic way a host polls for "did anything change" without re-parsing the whole registrant list every time. Reservation Release (Release action) is the polite way to give up a reservation; Clear is the forceful full reset, typically used in disaster-recovery/re-provisioning scenarios.""",
-                    source = "Base Spec 2.3 §7.5-§7.8; NVM Command Set Spec §5.9"
+                    source = "Base Spec 2.3 §7.5-§7.8; NVM Command Set Spec §5.9",
+                    diagram = ChapterDiagramSeed(
+                        caption = "Persistent reservation lifecycle",
+                        steps = listOf(
+                            DiagramStepSeed("Register", "get a key"),
+                            DiagramStepSeed("Acquire", "take/preempt a reservation"),
+                            DiagramStepSeed("Hold", "I/O allowed per Fig. 178"),
+                            DiagramStepSeed("Release / Clear")
+                        )
+                    )
                 ))
             )
         )

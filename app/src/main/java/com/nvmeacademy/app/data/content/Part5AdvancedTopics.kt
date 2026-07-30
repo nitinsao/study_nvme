@@ -65,7 +65,16 @@ object Part5AdvancedTopics {
                         "Copy commands carry independent PRINFOR (read-side) and PRINFOW (write-side) fields since a Copy's source and destination namespaces may use different protection formats."
                     ),
                     notes = """This chapter is the technical core behind why NVMe commands carry so many "tag" fields. The 64-bit CRC option (64b Guard) is expanded machinery relative to older NVMe generations and includes a fully worked CRC parameter set and test vectors in the spec for implementers to validate against. The DIF-vs-DIX distinction is purely about metadata buffer placement (contiguous vs separate), not about the protection algorithm itself - a common point of confusion worth calling out directly. PRINFO's presence in Read/Write/Compare/Verify (with PRACT forced to 0 for Compare/Verify, since there's no "generate protection info" concept when you're not writing) versus Copy's split PRINFOR/PRINFOW versus Write Zeroes' PRCHK-forced-to-zero (you can't "check" the protection info of a block you're about to erase) is a good comparative table for the app's UI.""",
-                    source = "NVM Command Set Spec §5.3, §5.3.1.1-§5.3.1.3, §5.3.2"
+                    source = "NVM Command Set Spec §5.3, §5.3.1.1-§5.3.1.3, §5.3.2",
+                    diagram = ChapterDiagramSeed(
+                        caption = "The three parts of protection information",
+                        connector = "none",
+                        steps = listOf(
+                            DiagramStepSeed("Guard", "CRC over data"),
+                            DiagramStepSeed("Application Tag", "host-defined"),
+                            DiagramStepSeed("Reference Tag", "ties block to its LBA")
+                        )
+                    )
                 ))
             ),
             ChapterSeed(

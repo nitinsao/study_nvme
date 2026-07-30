@@ -23,7 +23,11 @@ data class ChapterEntity(
     val level: String // "Beginner", "Intermediate", "Advanced"
 )
 
-/** One slide inside a chapter. bulletPoints are stored newline-delimited. */
+/**
+ * One slide inside a chapter. bulletPoints are stored newline-delimited.
+ * The diagram* fields are optional (diagramCaption blank = no diagram):
+ * diagramSteps is newline-delimited "label::sublabel::weight" triples.
+ */
 @Entity(tableName = "slides")
 data class SlideEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
@@ -32,7 +36,11 @@ data class SlideEntity(
     val title: String,
     val bulletPoints: String, // delimited by "\n"
     val detailedNotes: String,
-    val sourceCitation: String
+    val sourceCitation: String,
+    val diagramCaption: String = "",
+    val diagramOrientation: String = "H",
+    val diagramConnector: String = "arrow",
+    val diagramSteps: String = ""
 )
 
 enum class CommandSet {

@@ -20,7 +20,28 @@ data class SlideSeed(
     val title: String,
     val bullets: List<String>,
     val notes: String,
-    val source: String
+    val source: String,
+    val diagram: ChapterDiagramSeed? = null
+)
+
+/** One labeled box in a [ChapterDiagramSeed]. [weight] sizes it relative to its siblings (e.g. to show byte widths). */
+data class DiagramStepSeed(
+    val label: String,
+    val sublabel: String = "",
+    val weight: Float = 1f
+)
+
+/**
+ * A small, hand-authored diagram rendered above a slide's bullets: a
+ * caption plus an ordered chain of labeled boxes. [orientation] is "H" or
+ * "V"; [connector] is "arrow" (implies sequence/flow) or "none" (implies a
+ * flat grouping, e.g. sibling concepts or a byte-range map).
+ */
+data class ChapterDiagramSeed(
+    val caption: String,
+    val orientation: String = "H",
+    val connector: String = "arrow",
+    val steps: List<DiagramStepSeed>
 )
 
 data class ChapterSeed(

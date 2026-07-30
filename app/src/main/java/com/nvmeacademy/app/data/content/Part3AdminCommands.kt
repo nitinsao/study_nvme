@@ -47,7 +47,17 @@ object Part3AdminCommands {
                         "Namespace Management (0Dh) / Namespace Attachment (15h) form the namespace equivalent of the queue create/attach pattern."
                     ),
                     notes = """Queue management in NVMe is explicitly two-phase and asymmetric between completion queues and submission queues. A Completion Queue is a pure landing zone for command results; a Submission Queue must additionally declare which Completion Queue its results will land on, so the CQ must already exist. The reverse holds at teardown: you cannot delete a Completion Queue while a Submission Queue still points at it. The Feature/Attribute model (Get/Set Features) is NVMe's general-purpose configuration mechanism: a Feature Identifier names a configurable attribute of the controller, NVM subsystem, Endurance Group, NVM Set, or namespace, and the same FID is used by both Get Features and Set Features. Some Features carry their value entirely in Command Dword 11 of Set Features (Arbitration, Power Management, Temperature Threshold), while others transfer a larger data structure through the Data Pointer (Host Memory Buffer, Autonomous Power State Transition, Host Behavior Support). Every Feature can independently be marked saveable and changeable, which is why Get Features has a fourth Select value ("Supported Capabilities") purely to ask about those properties instead of the value itself. Namespace lifecycle mirrors the queue lifecycle pattern conceptually: Namespace Management creates or deletes the namespace's existence and capacity allocation, but a newly created namespace is not usable by any controller until a separate Namespace Attachment command attaches it - deliberately splitting "does this namespace exist" from "can this controller see it," which matters in multi-controller/multi-host subsystems and NVMe-oF fan-out scenarios.""",
-                    source = "NVMe Base Spec 2.3 §5.2.11, §5.2.20, §5.2.21, §5.2.26, §5.3.1-§5.3.6"
+                    source = "NVMe Base Spec 2.3 §5.2.11, §5.2.20, §5.2.21, §5.2.26, §5.3.1-§5.3.6",
+                    diagram = ChapterDiagramSeed(
+                        caption = "I/O queue lifecycle: order matters",
+                        steps = listOf(
+                            DiagramStepSeed("Create CQ"),
+                            DiagramStepSeed("Create SQ"),
+                            DiagramStepSeed("Use for I/O"),
+                            DiagramStepSeed("Delete SQ"),
+                            DiagramStepSeed("Delete CQ")
+                        )
+                    )
                 ))
             )
         )
