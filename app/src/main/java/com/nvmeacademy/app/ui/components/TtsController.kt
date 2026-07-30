@@ -24,6 +24,41 @@ private val SPEECH_ABBREVIATIONS: List<Pair<Regex, String>> = listOf(
 ).map { (pattern, replacement) -> Regex(pattern, RegexOption.IGNORE_CASE) to replacement }
 
 /**
+ * Acronyms this content uses constantly that a generic TTS engine tries to
+ * pronounce as a made-up word instead of spelling out. Case-sensitive and
+ * whole-word, since the spec always writes them in this exact casing; the
+ * "-oF" entry must precede the plain "NVMe" one so it isn't half-consumed
+ * by the shorter pattern first.
+ */
+private val ACRONYM_PRONUNCIATIONS: List<Pair<Regex, String>> = listOf(
+    "\\bNVMe-oF\\b" to "N V M e over Fabrics",
+    "\\bNVMe\\b" to "N V M E",
+    "\\bPCIe\\b" to "P C I E",
+    "\\bSR-IOV\\b" to "S R I O V",
+    "\\bRDMA\\b" to "R D M A",
+    "\\bSQID\\b" to "S Q I D",
+    "\\bCQID\\b" to "C Q I D",
+    "\\bSQE\\b" to "S Q E",
+    "\\bCQE\\b" to "C Q E",
+    "\\bSGL\\b" to "S G L",
+    "\\bPRP\\b" to "P R P",
+    "\\bLBA\\b" to "L B A",
+    "\\bSSD\\b" to "S S D",
+    "\\bANA\\b" to "A N A",
+    "\\bCID\\b" to "C I D",
+    "\\bDIF\\b" to "D I F",
+    "\\bDIX\\b" to "D I X",
+    "\\bTCP\\b" to "T C P",
+    "\\bSCT\\b" to "S C T"
+).map { (pattern, replacement) -> Regex(pattern) to replacement }
+
+/** "C0h-FFh" style hex ranges: handled before HEX_VALUE so the hyphen doesn't end up glued to a bare "hex". */
+private val HEX_RANGE = Regex("\\b([0-9A-F]{1,4})h-([0-9A-F]{1,4})h\\b")
+
+/** "05h" / "0Ah" / "FFh" style hex values: spelled as a made-up word otherwise, so speak their decimal value plus "hex". */
+private val HEX_VALUE = Regex("\\b([0-9A-F]{1,4})h\\b")
+
+/**
  * "bits 31:16" / "CDW10 31:16" style bit- or byte-ranges: the spec writes
  * these high:low, but that reads naturally low-to-high, e.g. "16 till 31".
  */
@@ -36,14 +71,25 @@ private val BIT_RANGE_COLON = Regex(
 private val RATIO_COLON = Regex("(\\d+)\\s*:\\s*(\\d+)")
 
 /**
- * Rewrites spec prose into something a TTS engine reads naturally: expands
- * common abbreviations it tends to spell out letter-by-letter, distinguishes
- * bit/byte-range colons (spoken low-to-high, "till") from ratio colons
- * (spoken in order, "to"), and demotes any other colon to a comma-length
- * pause instead of silence.
+ * Rewrites spec prose into something a TTS engine reads naturally: spells
+ * out domain acronyms and hex values it would otherwise mangle as fake
+ * words, expands common abbreviations it tends to spell out letter-by-letter,
+ * distinguishes bit/byte-range colons (spoken low-to-high, "till") from
+ * ratio colons (spoken in order, "to"), and demotes any other colon to a
+ * comma-length pause instead of silence.
  */
 internal fun normalizeForSpeech(raw: String): String {
-    var text = BIT_RANGE_COLON.replace(raw) { match ->
+    var text = raw
+    for ((pattern, replacement) in ACRONYM_PRONUNCIATIONS) {
+        text = pattern.replace(text, replacement)
+    }
+    text = HEX_RANGE.replace(text) { match ->
+        "${match.groupValues[1].toInt(16)} hex through ${match.groupValues[2].toInt(16)} hex"
+    }
+    text = HEX_VALUE.replace(text) { match ->
+        "${match.groupValues[1].toInt(16)} hex"
+    }
+    text = BIT_RANGE_COLON.replace(text) { match ->
         "${match.groupValues[1]} ${match.groupValues[3]} till ${match.groupValues[2]}"
     }
     text = RATIO_COLON.replace(text) { match ->
