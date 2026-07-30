@@ -21,6 +21,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -58,7 +60,10 @@ fun ChapterDiagram(
     val steps = remember(stepsRaw) { parseDiagramSteps(stepsRaw) }
     if (steps.isEmpty()) return
 
-    Column(modifier = modifier.fillMaxWidth()) {
+    // The bullets already say in words what this box-and-arrow diagram shows
+    // visually, so treat it as one decorative unit rather than letting a
+    // screen reader announce every individual box label separately.
+    Column(modifier = modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = caption }) {
         Text(
             caption,
             style = MaterialTheme.typography.labelLarge,
